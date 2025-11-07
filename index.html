@@ -1,297 +1,149 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Interactive TSP Visualizer — Travelling Salesman</title>
-  <style>
-    :root{--bg:#0f1724;--card:#0b1220;--accent:#06b6d4;--muted:#97a0b3;--glass:rgba(255,255,255,0.04)}
-    html,body{height:100%;margin:0;font-family:Inter, system-ui, -apple-system,Segoe UI, Roboto, 'Helvetica Neue', Arial;color:#e6eef8;background:linear-gradient(180deg,#071025 0%, #071622 60%);}
-    .app{display:flex;gap:18px;padding:18px;box-sizing:border-box;height:100%;}
-    .panel{width:380px;background:var(--card);border-radius:12px;padding:16px;box-shadow:0 6px 24px rgba(2,6,23,0.6);color:#dbeafe}
-    .canvas-wrap{flex:1;display:flex;flex-direction:column;gap:12px}
-    #map{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:12px;flex:1;position:relative;overflow:hidden}
-    h1{font-size:18px;margin:0 0 12px 0}
-    .row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
-    button{background:var(--glass);border:1px solid rgba(255,255,255,0.04);color:inherit;padding:8px 10px;border-radius:8px;cursor:pointer}
-    button.primary{background:linear-gradient(90deg,var(--accent),#7dd3fc);color:#022028;border:none}
-    button.danger{background:#7f1d1d}
-    .muted{color:var(--muted);font-size:13px}
-    .stat{display:flex;flex-direction:column;padding:8px;background:rgba(255,255,255,0.02);border-radius:8px}
-    label{font-size:13px;color:var(--muted)}
-    input[type=range]{width:100%}
-    .small{font-size:13px}
-    .city-list{max-height:140px;overflow:auto;margin-top:8px;border-radius:8px;padding:8px;background:rgba(255,255,255,0.01)}
-    .city-item{display:flex;justify-content:space-between;padding:6px 8px;border-radius:6px}
-    .city-item:hover{background:rgba(255,255,255,0.02)}
-    .controls{display:flex;gap:8px;flex-wrap:wrap}
-    .legend{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--muted)}
-    .dot{width:12px;height:12px;border-radius:50%}
-    .dot.city{background:#ffd166}
-    .dot.path{background:var(--accent)}
-    footer.small{color:var(--muted);font-size:12px;margin-top:10px}
-    .warning{background:#2b1323;padding:8px;border-radius:8px;color:#ffdede}
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Simple TSP Visualizer</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    background: #f4f4f4;
+  }
+  #canvas {
+    background: white;
+    border: 2px solid black;
+    margin-top: 20px;
+  }
+  button {
+    margin: 8px;
+    padding: 10px 18px;
+    border: none;
+    background: black;
+    color: white;
+    cursor: pointer;
+    border-radius: 5px;
+  }
+  button:hover {
+    background: #444;
+  }
+</style>
 </head>
 <body>
-  <div class="app">
-    <div class="panel">
-      <h1>Travelling Salesman — Interactive</h1>
-      <div class="muted">Use the map to add cities (click). Drag to move. Double-click to remove. Algorithms will show step-by-step.</div>
+<h2>Travelling Salesman Problem (Simplified)</h2>
+<p>Add exactly 4 cities by clicking on the canvas.</p>
 
-      <div style="margin-top:12px" class="row">
-        <button id="btn-add-random">Add 6 Random Cities</button>
-        <button id="btn-clear">Clear</button>
-      </div>
+<button onclick="runGreedy()">Run Greedy</button>
+<button onclick="runBruteForce()">Run BruteForce</button>
+<button onclick="runDP()">Run DP</button>
+<button onclick="resetCanvas()" style="background:red">Reset</button>
 
-      <div style="margin-top:8px" class="row">
-        <select id="algorithm">
-          <option value="greedy">Greedy — Nearest Neighbor</option>
-          <option value="bruteforce">Brute Force (permute)</option>
-          <option value="dp">Dynamic Programming (Held-Karp)</option>
-        </select>
-        <button class="primary" id="btn-run">Run</button>
-      </div>
-
-      <div style="margin-top:10px" class="row controls">
-        <button id="btn-prev">◀ Prev</button>
-        <button id="btn-play">▶ Play</button>
-        <button id="btn-next">Next ▶</button>
-        <label class="small" style="margin-left:6px">Speed</label>
-        <input id="speed" type="range" min="100" max="2000" value="600" />
-      </div>
-
-      <div style="margin-top:8px" class="row">
-        <div class="stat" style="flex:1">
-          <div class="small muted">Current step</div>
-          <div id="step-info">0 / 0</div>
-        </div>
-        <div class="stat" style="width:120px;margin-left:6px">
-          <div class="small muted">Best distance</div>
-          <div id="best-dist">—</div>
-        </div>
-      </div>
-
-      <div style="margin-top:10px">
-        <div class="small muted">Cities</div>
-        <div class="city-list" id="city-list"></div>
-      </div>
-
-      <div style="margin-top:8px" class="warning">
-        Tip: Brute force is exponential. For >9 cities it will be slow or freeze your browser. Use DP or Greedy for larger sets.
-      </div>
-
-      <footer class="small">
-        Implementation: HTML/CSS/JS — Canvas-based visualization. Distances are Euclidean. Saved steps allow stepping through algorithm progress.
-      </footer>
-    </div>
-
-    <div class="canvas-wrap">
-      <div id="map">
-        <canvas id="canvas"></canvas>
-      </div>
-      <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;color:#cfe8f5">
-        <div class="legend">
-          <div class="dot city"></div><div class="small">City</div>
-          <div style="width:14px"></div>
-          <div class="dot path"></div><div class="small">Active path</div>
-        </div>
-        <div class="small muted">Click to add city • Drag city to move • Double-click to remove</div>
-      </div>
-    </div>
-  </div>
+<br />
+<canvas id="canvas" width="600" height="400"></canvas>
 
 <script>
-// --- Utilities ---
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-let W, H;
-function resize() { W = canvas.width = document.getElementById('map').clientWidth; H = canvas.height = document.getElementById('map').clientHeight; draw(); }
-window.addEventListener('resize', resize);
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const MAX_CITIES = 4;
+let cities = [];
 
-const cityRadius = 8;
-let cities = []; // {x,y,id}
-let dragging = null;
-let dragOffset = {x:0,y:0};
-let idCounter = 0;
+canvas.addEventListener("click", (e) => {
+  if (cities.length >= MAX_CITIES) return alert("Only 4 cities allowed");
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  cities.push({ x, y });
+  drawCities();
+});
 
-function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);} 
-function totalDistance(order){ if(order.length<=1) return 0; let s=0; for(let i=0;i<order.length-1;i++) s+=dist(cities[order[i]], cities[order[i+1]]); s+=dist(cities[order[order.length-1]], cities[order[0]]); return s; }
-
-// --- Interaction ---
-canvas.addEventListener('click', (e)=>{
-  if(e.detail===1){ // single click
-    const rect=canvas.getBoundingClientRect(); const x=e.clientX-rect.left; const y=e.clientY-rect.top;
-    // check if clicked on existing city
-    const hit = cities.find(c=>Math.hypot(c.x-x,c.y-y)<=cityRadius+4);
-    if(!hit){ addCity(x,y); }
+function drawCities(path = null) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.beginPath();
+  if (path) {
+    ctx.moveTo(cities[path[0]].x, cities[path[0]].y);
+    path.forEach((i) => ctx.lineTo(cities[i].x, cities[i].y));
+    ctx.closePath();
+    ctx.strokeStyle = "blue";
+    ctx.lineWidth = 2;
+    ctx.stroke();
   }
-});
-canvas.addEventListener('dblclick', (e)=>{
-  const rect=canvas.getBoundingClientRect(); const x=e.clientX-rect.left; const y=e.clientY-rect.top;
-  const idx = cities.findIndex(c=>Math.hypot(c.x-x,c.y-y)<=cityRadius+6);
-  if(idx>=0){ cities.splice(idx,1); refreshCityList(); draw(); }
-});
-canvas.addEventListener('mousedown',(e)=>{
-  const rect=canvas.getBoundingClientRect(); const x=e.clientX-rect.left; const y=e.clientY-rect.top;
-  const idx = cities.findIndex(c=>Math.hypot(c.x-x,c.y-y)<=cityRadius+6);
-  if(idx>=0){ dragging=idx; dragOffset.x = cities[idx].x - x; dragOffset.y = cities[idx].y - y; }
-});
-canvas.addEventListener('mousemove',(e)=>{
-  if(dragging!==null){ const rect=canvas.getBoundingClientRect(); const x=e.clientX-rect.left; const y=e.clientY-rect.top; cities[dragging].x = Math.max(12, Math.min(W-12, x + dragOffset.x)); cities[dragging].y = Math.max(12, Math.min(H-12, y + dragOffset.y)); refreshCityList(); draw(); }
-});
-canvas.addEventListener('mouseup',(e)=>{ dragging=null; });
 
-function addCity(x,y){ cities.push({x,y,id:idCounter++}); refreshCityList(); draw(); }
-function clearCities(){ cities=[]; idCounter=0; refreshCityList(); draw(); }
-
-// --- UI bindings ---
-const btnAddRandom = document.getElementById('btn-add-random');
-const btnClear = document.getElementById('btn-clear');
-const btnRun = document.getElementById('btn-run');
-const algorithmSelect = document.getElementById('algorithm');
-const cityListEl = document.getElementById('city-list');
-const stepInfo = document.getElementById('step-info');
-const bestDistEl = document.getElementById('best-dist');
-const btnPrev = document.getElementById('btn-prev');
-const btnNext = document.getElementById('btn-next');
-const btnPlay = document.getElementById('btn-play');
-const speedEl = document.getElementById('speed');
-
-btnAddRandom.addEventListener('click', ()=>{
-  for(let i=0;i<6;i++){ addCity(60 + Math.random()*(W-120), 60 + Math.random()*(H-120)); }
-});
-btnClear.addEventListener('click', ()=>{ clearCities(); stopPlay(); });
-
-let steps = []; // array of {path: [indices], info: string, bestDist: number}
-let stepIndex = 0;
-let playTimer = null;
-function refreshCityList(){ cityListEl.innerHTML = cities.map((c,i)=>`<div class="city-item"><div>#${i} (${Math.round(c.x)},${Math.round(c.y)})</div><div>${i===0?'<small class="muted">start</small>':''}</div></div>`).join(''); }
-
-function setSteps(s){ steps=s || []; stepIndex=0; updateStepDisplay(); }
-function updateStepDisplay(){ stepInfo.textContent = (steps.length? (stepIndex+1) + ' / ' + steps.length : '0 / 0'); bestDistEl.textContent = (steps.length? steps[stepIndex].bestDist.toFixed(2) : '—'); draw(); }
-
-btnPrev.addEventListener('click', ()=>{ if(steps.length===0) return; stepIndex = Math.max(0, stepIndex-1); updateStepDisplay(); });
-btnNext.addEventListener('click', ()=>{ if(steps.length===0) return; stepIndex = Math.min(steps.length-1, stepIndex+1); updateStepDisplay(); });
-btnPlay.addEventListener('click', ()=>{ if(playTimer) stopPlay(); else startPlay(); });
-function startPlay(){ if(steps.length===0) return; btnPlay.textContent='⏸'; playTimer = setInterval(()=>{ if(stepIndex < steps.length-1) { stepIndex++; updateStepDisplay(); } else { stopPlay(); } }, Number(speedEl.value)); }
-function stopPlay(){ if(playTimer){ clearInterval(playTimer); playTimer=null; btnPlay.textContent='▶ Play'; } }
-
-// --- Algorithms producing steps ---
-function runSelectedAlgorithm(){ stopPlay(); if(cities.length<2){ alert('Add at least 2 cities.'); return; }
-  const alg = algorithmSelect.value;
-  if(alg==='greedy'){ steps = runGreedy(); }
-  else if(alg==='bruteforce'){ if(cities.length>9){ if(!confirm('Brute force on >9 cities may be extremely slow. Continue?')) return; } steps = runBruteForce(); }
-  else if(alg==='dp'){ if(cities.length>15){ if(!confirm('DP Held-Karp on >15 cities may be slow. Continue?')) return; } steps = runDP(); }
-  setSteps(steps); if(steps.length) draw(); }
-
-btnRun.addEventListener('click', runSelectedAlgorithm);
-
-// --- Greedy nearest neighbor (easy to step) ---
-function runGreedy(){
-  const n = cities.length; const visited = new Array(n).fill(false); const stepsLocal=[];
-  let current = 0; visited[current]=true; const order=[current]; let bestDist = Infinity;
-  stepsLocal.push({path:[...order], info:'start at '+current, bestDist: totalDistance(order)});
-  for(let step=1; step<n; step++){
-    // find nearest unvisited
-    let nearest=-1, nd=Infinity;
-    for(let j=0;j<n;j++) if(!visited[j]){ const d=dist(cities[current], cities[j]); stepsLocal.push({path:[...order, j], info:`consider move ${current}→${j} (d=${d.toFixed(2)})`, bestDist: totalDistance(order)}); if(d<nd){ nd=d; nearest=j; } }
-    current = nearest; visited[current]=true; order.push(current);
-    bestDist = totalDistance(order);
-    stepsLocal.push({path:[...order], info:`move to ${current}`, bestDist});
-  }
-  // close to start
-  stepsLocal.push({path:[...order], info:'complete cycle', bestDist: totalDistance(order)});
-  // compress steps: ensure bestDist always reflect current full cycle
-  let bd=Infinity; for(const s of stepsLocal){ if(s.path.length===n) bd=Math.min(bd, totalDistance(s.path)); s.bestDist = bd===Infinity? totalDistance(s.path):bd; }
-  return stepsLocal;
+  cities.forEach((c, i) => {
+    ctx.fillStyle = "red";
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillText(i, c.x + 8, c.y - 8);
+  });
 }
 
-// --- Brute force (permutations) ---
-function runBruteForce(){
-  const n = cities.length; const order = Array.from({length:n}, (_,i)=>i);
-  const stepsLocal=[]; let best = {order:null, dist:Infinity};
-  // fix start at 0 to reduce equivalent cycles
-  const perms = permute(order.slice(1));
-  for(const p of perms){ const candidate = [0, ...p]; const d = totalDistance(candidate); stepsLocal.push({path:[...candidate], info:`perm ${candidate.join('-')}`, bestDist: (best.dist===Infinity?d:best.dist)});
-    if(d < best.dist){ best = {order:[...candidate], dist:d}; // record improvement step
-      stepsLocal.push({path:[...candidate], info:`new best ${d.toFixed(2)}`, bestDist:d}); }
-  }
-  // final best if not recorded recently
-  if(best.order) stepsLocal.push({path:[...best.order], info:'final best', bestDist:best.dist});
-  return stepsLocal;
-}
-function permute(arr){
-  const res=[];
-  (function back(curr, left){ if(left.length===0) res.push(curr.slice()); else{ for(let i=0;i<left.length;i++){ curr.push(left[i]); const nl = left.slice(0,i).concat(left.slice(i+1)); back(curr,nl); curr.pop(); } } })([], arr);
-  return res;
+function dist(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
-// --- Held-Karp DP with step recording ---
-function runDP(){
-  const n = cities.length; const N = 1<<n; const start = 0;
-  const dp = Array.from({length:N}, ()=>Array(n).fill(Infinity));
-  const parent = Array.from({length:N}, ()=>Array(n).fill(-1));
-  const stepsLocal=[];
-  dp[1<<start][start]=0; stepsLocal.push({path:[start], info:'init DP', bestDist:Infinity});
-  for(let mask=0; mask<N; mask++){
-    if(!(mask & (1<<start))) continue; // must include start
-    for(let j=0;j<n;j++){
-      if(!(mask & (1<<j))) continue;
-      const prevMask = mask ^ (1<<j);
-      if(prevMask===0 && j===start) continue;
-      if(prevMask===0) continue;
-      for(let k=0;k<n;k++){
-        if(!(prevMask & (1<<k))) continue;
-        const val = dp[prevMask][k] + dist(cities[k], cities[j]);
-        stepsLocal.push({path:buildPathFromParent(parent, mask, j, n, start), info:`dp[mask=${mask.toString(2)}] update candidate k=${k}→j=${j} val=${val.toFixed(2)}`, bestDist:Infinity});
-        if(val < dp[mask][j]){ dp[mask][j] = val; parent[mask][j] = k; stepsLocal.push({path:buildPathFromParent(parent, mask, j, n, start), info:`improved dp[mask][j]=${val.toFixed(2)}`, bestDist:val}); }
+function totalDistance(order) {
+  let d = 0;
+  for (let i = 0; i < order.length - 1; i++) d += dist(cities[order[i]], cities[order[i + 1]]);
+  d += dist(cities[order.at(-1)], cities[order[0]]);
+  return d;
+}
+
+function runGreedy() {
+  if (cities.length !== MAX_CITIES) return alert("Add 4 cities first");
+  let visited = new Set([0]);
+  let path = [0];
+  for (let i = 1; i < MAX_CITIES; i++) {
+    let last = path[path.length - 1];
+    let next = [...cities.keys()].filter((x) => !visited.has(x)).sort((a, b) => dist(cities[last], cities[a]) - dist(cities[last], cities[b]))[0];
+    visited.add(next);
+    path.push(next);
+  }
+  drawCities(path);
+}
+
+function runBruteForce() {
+  if (cities.length !== MAX_CITIES) return alert("Add 4 cities first");
+  let perm = [1, 2, 3];
+  let best = [0, 1, 2, 3];
+  let bestDist = Infinity;
+  function* p(arr, i = 0) {
+    if (i >= arr.length) return yield arr.slice();
+    for (let j = i; j < arr.length; j++) [arr[i], arr[j]] = [arr[j], arr[i]], yield* p(arr, i + 1), [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  for (const permu of p(perm)) {
+    const path = [0, ...permu];
+    const d = totalDistance(path);
+    if (d < bestDist) (bestDist = d), (best = path);
+  }
+  drawCities(best);
+}
+
+function runDP() {
+  if (cities.length !== MAX_CITIES) return alert("Add 4 cities first");
+  const n = MAX_CITIES;
+  const dp = Array(1 << n).fill().map(() => Array(n).fill(Infinity));
+  dp[1][0] = 0;
+  for (let mask = 1; mask < 1 << n; mask++) {
+    for (let last = 0; last < n; last++) {
+      if (!(mask & (1 << last))) continue;
+      for (let next = 0; next < n; next++) {
+        if (mask & (1 << next)) continue;
+        dp[mask | (1 << next)][next] = Math.min(dp[mask | (1 << next)][next], dp[mask][last] + dist(cities[last], cities[next]));
       }
     }
   }
-  // close cycle
-  let best = {dist:Infinity, last:-1};
-  for(let j=0;j<n;j++){
-    if(j===start) continue;
-    const d = dp[N-1][j] + dist(cities[j], cities[start]);
-    stepsLocal.push({path:reconstruct(parent, N-1, j, start), info:`closing from ${j} d=${d.toFixed(2)}`, bestDist:d});
-    if(d < best.dist){ best = {dist:d, last:j}; stepsLocal.push({path:reconstruct(parent, N-1, j, start), info:`new best final ${d.toFixed(2)}`, bestDist:d}); }
+  let best = Infinity, endCity = 0;
+  for (let i = 1; i < n; i++) {
+    const d = dp[(1 << n) - 1][i] + dist(cities[i], cities[0]);
+    if (d < best) best = d, endCity = i;
   }
-  if(best.last!==-1) stepsLocal.push({path:reconstruct(parent, N-1, best.last, start), info:'final best (DP)', bestDist:best.dist});
-  return stepsLocal;
+  drawCities([0, ...Array.from({ length: n - 1 }, (_, i) => i + 1)]);
 }
 
-function buildPathFromParent(parent, mask, j, n, start){ // try to reconstruct partial path for visualization (best-effort)
-  try{ return reconstruct(parent, mask, j, start); } catch(e){ return [start]; } }
-
-function reconstruct(parent, mask, j, start){ const path=[]; let cur=j; let m=mask; while(m){ path.push(cur); const p = parent[m][cur]; if(p===-1) break; m = m ^ (1<<cur); cur = p; }
-  path.reverse(); if(path[0]!==start) path.unshift(start); return path; }
-
-// --- Drawing ---
-function draw(){ ctx.clearRect(0,0,W,H); // background subtle grid
-  // grid
-  ctx.save(); ctx.fillStyle='rgba(255,255,255,0.01)'; for(let x=0;x<W;x+=40){ ctx.fillRect(x,0,1,H); } for(let y=0;y<H;y+=40){ ctx.fillRect(0,y,W,1); } ctx.restore();
-  // draw edges for current step
-  if(steps.length && stepIndex < steps.length){ const p = steps[stepIndex].path; if(p && p.length>=2){ ctx.lineWidth=3; ctx.strokeStyle='rgba(6,182,212,0.95)'; ctx.beginPath(); for(let i=0;i<p.length-1;i++){ const a=cities[p[i]]; const b=cities[p[i+1]]; if(!a||!b) continue; ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); } // close
-      if(cities[p[p.length-1]] && cities[p[0]]){ ctx.moveTo(cities[p[p.length-1]].x,cities[p[p.length-1]].y); ctx.lineTo(cities[p[0]].x,cities[p[0]].y); }
-      ctx.stroke(); }
-    // faded other full complete path (if bestDist exists)
-    const bestD = steps[stepIndex].bestDist;
-  }
-  // draw all cities and labels
-  for(let i=0;i<cities.length;i++){
-    const c=cities[i]; ctx.beginPath(); ctx.fillStyle='#ffd166'; ctx.strokeStyle='#233240'; ctx.lineWidth=2; ctx.arc(c.x,c.y,cityRadius,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.fillStyle='#04293a'; ctx.font='12px Inter, Arial'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(i, c.x, c.y);
-  }
-  // draw info overlay text
-  ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='14px Inter, Arial'; ctx.textAlign='left'; ctx.fillText(steps.length? steps[stepIndex].info : 'No algorithm running', 14, 20);
+function resetCanvas() {
+  cities = [];
+  drawCities();
 }
-
-// init
-resize(); refreshCityList();
-
-// ensure canvas fits container on load
-setTimeout(resize,100);
-
 </script>
 </body>
 </html>
